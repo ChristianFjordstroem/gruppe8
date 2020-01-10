@@ -143,31 +143,37 @@ type Board () =
         (vacant, opponent)
 
 [<AbstractClass>]
-type Player(color, board) =
+type Player(color, board) = 
   let _color : Color = color
   let _board : Board = board
   abstract member nextMove : unit -> string
 
 type Human(color, board) =
   inherit Player(color, board)
-  override this.nextMove() =
-    printfn "Enter move or quit: "
-    let codestring = System.Console.ReadLine()
-    if (codestring.ToLower() = "quit") then
-      codestring
-    else
-      let lCodestring = codestring.ToLower()
-      let startCoordX = int lCodestring.[1] - 49
-      let startCoordY = int lCodestring.[0] - 97
-      let destCoordX = int lCodestring.[4] - 49
-      let destCoordY = int lCodestring.[3] - 97
-      let dest = (destCoordX, destCoordY)
-      let piece = board.[startCoordX, startCoordY]
-      let pieceNoOption =
-        match piece with
-        | Some p -> p
-      let availableMoves = fst (board.availableMoves pieceNoOption)
-      if List.contains dest availableMoves = true then
-        codestring
+  override this.nextMove() = 
+    let mutable valid = false
+    let mutable codestring = ""
+    while not valid do
+      printfn "Enter move or quit: "
+      codestring <- System.Console.ReadLine()
+      if (codestring.ToLower() = "quit") then
+        valid <- true
+      elif codestring.Length < 5 then 
+        printfn "Movement was invalid"
       else
-        "Movement was not valid"
+        let lCodestring = codestring.ToLower()
+        let startCoordX = int lCodestring.[1] - 49
+        let startCoordY = int lCodestring.[0] - 97
+        let destCoordX = int lCodestring.[4] - 49
+        let destCoordY = int lCodestring.[3] - 97
+        let dest = (destCoordX, destCoordY)
+        let piece = board.[startCoordX, startCoordY]
+        if piece.IsSome then
+          let availableMoves = fst (board.availableMoves piece.Value)
+          if List.contains dest availableMoves then
+            valid <- true
+          else
+            printfn "Movement was invalid"
+        else
+          printfn "No piece at start coordinate"
+    codestring
