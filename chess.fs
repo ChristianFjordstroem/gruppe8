@@ -1,4 +1,5 @@
 module Chess
+
 /// The possible colors of chess pieces
 type Color = White | Black
 
@@ -138,42 +139,97 @@ type Board () =
         let vacantPieceLists = List.map convertNWrap piece.candiateRelativeMoves
         // Extract and merge lists of vacant squares
         let vacant = List.collect fst vacantPieceLists
-        // Extract and merge lists of first obstruction pieces and filter out own pieces
-        let opponent = List.choose snd vacantPieceLists
+        // Extract and merge lists of first obstruction pieces and filter out own pieces (FIXED to only include enemy pieces using List.Filter)
+        let opponent = List.filter (fun (p : chessPiece) -> p.color <> piece.color) (List.choose snd vacantPieceLists)
         (vacant, opponent)
 
+/// <summary> Abstract player for the chess game, which must be inherited from. </summary>
+/// <param name="color"> The color of the player. </param>
+/// <param name="board"> The chessboard the player is playing on. </param>
 [<AbstractClass>]
 type Player(color, board) = 
   let _color : Color = color
   let _board : Board = board
-  abstract member nextMove : unit -> string
 
+  /// <summary> 
+  ///   Gets the next move for the player and returns the move as a codestring or "quit".
+  ///   Codestrings are formatted as "a1 a5", where a1 is the position of the piece to move and a5 is the destination to move the piece to.
+  ///   The method ensures that the codestring is valid, meaning there is a piece at the source position, 
+  ///   it belongs to the player, and the target position is a valid move for that piece.
+  /// </summary>
+  /// <returns> Returns either "quit" or a valid codestring. </returns>
+  abstract member nextMove : unit -> string
+  
+  /// <summary> Gets the color of the player. </summary>
+  /// <returns> The color of the player. </returns>
+  member this.color = color
+
+  /// <summary> Parses a codestring into source and target position. </summary>
+  /// <returns> Returns the source and target position as a tuple option or None if the codestring is invalid. </returns>
+  member this.parseCodestring (codestring : string) : (Position * Position) option =
+    if codestring.Length <> 5 || codestring.[2] <> ' ' then
+      None
+    else
+      let lCodestring = codestring.ToLower()
+      let sourceFile = int lCodestring.[0] - 97
+      let sourceRank = int lCodestring.[1] - 49
+      let targetFile = int lCodestring.[3] - 97
+      let targetRank = int lCodestring.[4] - 49
+      if sourceFile >= 0 && sourceFile < 8 && sourceRank >= 0 && sourceRank < 8 && targetFile >= 0 && targetFile < 8 && targetRank >= 0 && targetRank < 8 then
+        let source = (sourceRank, sourceFile)
+        let target = (targetRank, targetFile)
+        Some (source, target)
+      else
+        None
+
+/// <summary> Human player for the chess game. </summary>
+/// <param name="color"> The color of the player. </param>
+/// <param name="board"> The chessboard the player is playing on. </param>
 type Human(color, board) =
   inherit Player(color, board)
+
+  /// <summary> 
+  ///   Asks the player through the console for a valid command. 
+  ///   See description in parent class Player for details on command format.
+  /// </summary>
+  /// <returns> Returns either "quit" or a valid codestring. </returns>
   override this.nextMove() = 
     let mutable valid = false
     let mutable codestring = ""
+    // Keep asking player until he enters something valid
     while not valid do
-      printfn "Enter move or quit: "
+      printfn "%s" (color.ToString() + ": Enter move or quit: ")
       codestring <- System.Console.ReadLine()
       if (codestring.ToLower() = "quit") then
         valid <- true
-      elif codestring.Length < 5 then 
-        printfn "Movement was invalid"
       else
-        let lCodestring = codestring.ToLower()
-        let startCoordX = int lCodestring.[1] - 49
-        let startCoordY = int lCodestring.[0] - 97
-        let destCoordX = int lCodestring.[4] - 49
-        let destCoordY = int lCodestring.[3] - 97
-        let dest = (destCoordX, destCoordY)
-        let piece = board.[startCoordX, startCoordY]
-        if piece.IsSome then
-          let availableMoves = fst (board.availableMoves piece.Value)
-          if List.contains dest availableMoves then
-            valid <- true
+        let move = this.parseCodestring codestring
+        // Check if entered codestring is valid
+        if move.IsSome then
+          // Extract source and target position
+          let source = fst move.Value
+          let target = snd move.Value
+          // Get piece from board at source position
+          let piece = board.[fst source, snd source]
+          // Check there is a piece on the source position
+          if piece.IsSome then
+            // Check piece belongs to player
+            if piece.Value.color = color then
+              // Get available moves for piece
+              let availableMoves = board.availableMoves piece.Value
+              // Available moves to vacant positions
+              let vacantMoves = fst availableMoves
+              // Available moves to enemy positions (maps from piece to position)
+              let enemyMoves = List.map (fun (piece : chessPiece) -> piece.position.Value) (snd availableMoves)
+              // Check if entered target position is among valid moves
+              if List.contains target vacantMoves || List.contains target enemyMoves then
+                valid <- true
+              else
+                printfn "Movement was invalid."
+            else
+              printfn "Opponent piece at start coordinate."
           else
-            printfn "Movement was invalid"
+            printfn "No piece at start coordinate."
         else
-          printfn "No piece at start coordinate"
+          printfn "Movement was invalid."
     codestring

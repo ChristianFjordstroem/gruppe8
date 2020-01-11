@@ -1,24 +1,50 @@
 open Chess
 open Pieces
 
-/// Print various information about a piece
-let printPiece (board : Board) (p : chessPiece) : unit =
-  printfn "%A: %A %A" p p.position (board.availableMoves p)
+/// <summary> Game class for a simple chess game. </summary>
+type Game() =
+  //Initialize players
+  let _board = Board()
+  let _player = Human(White, _board)
+  let _opponent = Human(Black, _board)
 
-// Create a game
-let board = Chess.Board () // Create a board
-// Pieces are kept in an array for easy testing
-let pieces = [|
-  king (White) :> chessPiece;
-  rook (White) :> chessPiece;
-  king (Black) :> chessPiece |]
-// Place pieces on the board
-board.[0,0] <- Some pieces.[0]
-board.[1,1] <- Some pieces.[1]
-board.[4,1] <- Some pieces.[2]
-printfn "%A" board
-Array.iter (printPiece board) pieces
-// Make moves
-board.move (1,1) (3,1) // Moves a piece from (1,1) to (3,1)
-printfn "%A" board
-Array.iter (printPiece board) pieces
+  // Constructor
+  do
+    // Place pieces on board
+    _board.[0,0] <- Some (rook (White) :> chessPiece)
+    _board.[0,4] <- Some (king (White) :> chessPiece)
+    _board.[0,7] <- Some (rook (White) :> chessPiece)
+    _board.[7,0] <- Some (rook (Black) :> chessPiece)
+    _board.[7,4] <- Some (king (Black) :> chessPiece)
+    _board.[7,7] <- Some (rook (Black) :> chessPiece)
+
+  /// <summary> Prints the valid moves for a piece </summary>
+  /// <param name="p"> Piece to print. </param>
+  let printPiece (p : chessPiece) : unit =
+    printfn "%A: %A %A" p p.position (_board.availableMoves p)
+
+  /// <summary> Runs the game until a player enters quit. </summary>
+  member this.run () =
+    let rec aTurn (p1: Player) (p2: Player) : unit =
+      printfn "%A" _board
+      printfn "Player pieces and available moves:"
+      for rank = 0 to 7 do
+        for file = 0 to 7 do
+          let pieceOption = _board.[rank, file]
+          if pieceOption.IsSome && pieceOption.Value.color = p1.color then
+            printPiece pieceOption.Value
+      // Ask player for next move
+      let codestring = p1.nextMove()
+      // Execute move or quit
+      let lCodestring = codestring.ToLower()
+      if lCodestring.ToLower() <> "quit" then
+        let move = p1.parseCodestring codestring
+        _board.move (fst move.Value) (snd move.Value)
+        aTurn p2 p1
+
+    aTurn _player _opponent
+    printfn "\nThanks for playing!"
+
+// Run the game
+let game = Game()
+game.run()
